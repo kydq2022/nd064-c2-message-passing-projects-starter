@@ -7,9 +7,14 @@ from app.udaconnect.models import Connection, Location, Person
 from app.udaconnect.schemas import ConnectionSchema, LocationSchema, PersonSchema
 from geoalchemy2.functions import ST_AsText, ST_Point
 from sqlalchemy.sql import text
+import os
+import grpc
+import persons_pb2
+import persons_pb2_grpc
 
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger("udaconnect-api")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("connection-api")
 
 
 class ConnectionService:
@@ -30,7 +35,13 @@ class ConnectionService:
         ).all()
 
         # Cache all users in memory for quick lookup
-        person_map: Dict[str, Person] = {person.id: person for person in PersonService.retrieve_all()}
+        grpc_server_address = os.environ["GRPC_SERVER_ADDRESS"]
+        channel = grpc.insecure_channel(grpc_server_address)
+        stub = persons_pb2_grpc.PersonServiceStub(channel=channel)
+        request = persons_pb2.RetrieveAllPersonsRequest()
+        list_persons: persons_pb2.ListPerson = stub.RetrieveAllPersons(request)
+        person_map: Dict[str, Person] = {person.id: person for person in list_persons.persons}
+        logging.info(person_map)
 
         # Prepare arguments for queries
         data = []
@@ -79,56 +90,3 @@ class ConnectionService:
                 )
 
         return result
-
-
-class LocationService:
-    @staticmethod
-    def retrieve(location_id) -> Location:
-        location, coord_text = (
-            db.session.query(Location, Location.coordinate.ST_AsText())
-            .filter(Location.id == location_id)
-            .one()
-        )
-
-        # Rely on database to return text form of point to reduce overhead of conversion in app code
-        location.wkt_shape = coord_text
-        return location
-
-    @staticmethod
-    def create(location: Dict) -> Location:
-        validation_results: Dict = LocationSchema().validate(location)
-        if validation_results:
-            logger.warning(f"Unexpected data format in payload: {validation_results}")
-            raise Exception(f"Invalid payload: {validation_results}")
-
-        new_location = Location()
-        new_location.person_id = location["person_id"]
-        new_location.creation_time = location["creation_time"]
-        new_location.coordinate = ST_Point(location["latitude"], location["longitude"])
-        db.session.add(new_location)
-        db.session.commit()
-
-        return new_location
-
-
-class PersonService:
-    @staticmethod
-    def create(person: Dict) -> Person:
-        new_person = Person()
-        new_person.first_name = person["first_name"]
-        new_person.last_name = person["last_name"]
-        new_person.company_name = person["company_name"]
-
-        db.session.add(new_person)
-        db.session.commit()
-
-        return new_person
-
-    @staticmethod
-    def retrieve(person_id: int) -> Person:
-        person = db.session.query(Person).get(person_id)
-        return person
-
-    @staticmethod
-    def retrieve_all() -> List[Person]:
-        return db.session.query(Person).all()

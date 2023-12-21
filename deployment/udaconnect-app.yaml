@@ -9,7 +9,6 @@ spec:
   - name: "3000"
     port: 3000
     targetPort: 3000
-    nodePort: 30000
   selector:
     service: udaconnect-app
   type: NodePort
@@ -31,7 +30,7 @@ spec:
         service: udaconnect-app
     spec:
       containers:
-      - image: udacity/nd064-udaconnect-app:latest
+      - image: kydq2022/nd064-c2-udaconnect-app:latest
         name: udaconnect-app
         imagePullPolicy: Always
         resources:
@@ -41,4 +40,9 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "256m"
+        env:
+        - name: PERSON_API
+          value: "person-api:5000"
+        - name: CONNECTION_API
+          value: "person-api:5000"
       restartPolicy: Always
