@@ -6,7 +6,7 @@
 
 Our system involves the development of a distributed application with multiple services, each serving a specific purpose. The primary components include a frontend (fe) that serves as a REST API, a `connection` service that retrieves data from a `person-rpc` service using gRPC, and a mechanism for creating `person` and `location` entities using a Kafka topic.
 
-![Alt text](system_architecture.png)
+![Alt text](architecture_design.png)
 
 ## Decision 1: Frontend as REST API
 
